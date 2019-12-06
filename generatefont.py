@@ -1,10 +1,13 @@
 #!/usr/bin/env python
+from itertools import chain
 import logging
 import string
 import sys
 
 from fontTools.ttLib import TTFont
 from fontTools.feaLib.builder import Builder, addOpenTypeFeatures, addOpenTypeFeaturesFromString
+from fontTools.unicode import Unicode
+
 
 
 translation_table = {
@@ -18,6 +21,7 @@ translation_table = {
     '7': r'\seven',
     '8': r'\eight',
     '9': r'\nine',
+    ' ': r'\space'
 }
 for c in string.ascii_uppercase:
     translation_table[c] = '\\'+c
@@ -25,6 +29,16 @@ for c in string.ascii_uppercase:
 
 attacked_fingerprint = sys.argv[1]
 replacement_fingerprint = sys.argv[2]
+attacked_font = sys.argv[3]
+font = TTFont(attacked_font)
+
+# Somehow, I cannot add an "intermediate" glyph to the font, so we're using some glyph that is available.
+# This is a bit dirty, because it changes all occurences of that glyph into our new fingerprint.
+unichars = chain.from_iterable([y for y in x.cmap.items() if y[1].startswith("uni")] for x in font["cmap"].tables)
+last_unichar = list(unichars)[-1] # we take the last "uni...." glyph, because we believe it's used less often than the first ones...
+# The main problem being, that I can only make "uni...." replacements in the feature file
+last_uni = last_unichar[1]
+# If we can't pass here, the font doesn't have any "uni" characters.
 
 attacked_sub = " ".join((translation_table[c] for c in attacked_fingerprint))
 replacement_sub = " ".join((translation_table[c] for c in replacement_fingerprint))
@@ -33,12 +47,12 @@ replacement_sub = " ".join((translation_table[c] for c in replacement_fingerprin
 features = r'''
 lookup ligaStandardLigaturesinLatinlookup3 {
   lookupflag 0;
-    sub %s   by \uniE600;
+''' f"    sub {attacked_sub}   by {last_uni};" '''
 } ligaStandardLigaturesinLatinlookup3;
 
 lookup ligaStandardLigaturesinLatinlookup4 {
   lookupflag 0;
-    sub \uniE600 by %s ;
+''' f"    sub {last_uni} by {replacement_sub} ;" '''
 } ligaStandardLigaturesinLatinlookup4;
 
 feature RQD  {
@@ -56,11 +70,8 @@ feature liga {
       lookup ligaStandardLigaturesinLatinlookup3;
       lookup ligaStandardLigaturesinLatinlookup4;
 } liga;
-''' % (attacked_sub, replacement_sub)
+'''
 
-attacked_font = sys.argv[3]
-font = TTFont("SansBullshitSans.ttf") # We work on a hard-coded font for now.
-font = TTFont(attacked_font)
 addOpenTypeFeaturesFromString(font, features)
 
 save_new_font_path = sys.argv[4]
