@@ -58,9 +58,10 @@ feature liga {
 } liga;
 ''' % (attacked_sub, replacement_sub)
 
-
+attacked_font = sys.argv[3]
 font = TTFont("SansBullshitSans.ttf") # We work on a hard-coded font for now.
+font = TTFont(attacked_font)
 addOpenTypeFeaturesFromString(font, features)
 
-target_path = sys.argv[3]
-font.save(target_path)
+save_new_font_path = sys.argv[4]
+font.save(save_new_font_path)
